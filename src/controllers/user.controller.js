@@ -40,6 +40,7 @@ const login = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -73,23 +74,77 @@ const verifyOTPAndUpdatePassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    const userEmail = req.user.sub; // Get email from decoded token
-    const user = await userServices.getUserByEmail(userEmail);
+    if (!req.user || !req.user.email) {
+      return res.status(400).json({ message: "Invalid user token" });
+    }
+
+    const userEmail = req.user.email;
+    const user = await userServices.getUserProfile(userEmail);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Return user profile without sensitive information
     res.status(200).json({
       username: user.username,
       email: user.email,
-      avatar: user.avatar,
-      role: user.role,
-      created_at: user.created_at,
+      password: "********", // Ẩn mật khẩu
     });
   } catch (error) {
-    console.error("Error in getUserProfile controller:", error.message);
+    console.error("Error in getUserProfile controller:", error);
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? "An unexpected error occurred"
+        : error.message;
+
+    res.status(500).json({ message: errorMessage });
+  }
+};
+
+const updateUserProfile = async (req, res) => {
+  try {
+    if (!req.user || !req.user.email) {
+      return res.status(400).json({ message: "Invalid user token" });
+    }
+
+    const { username, password } = req.body;
+    const userEmail = req.user.email;
+
+    // Validate input
+    if (!username && !password) {
+      return res.status(400).json({ message: "No update data provided" });
+    }
+
+    if (username && username.length < 3) {
+      return res
+        .status(400)
+        .json({ message: "Username must be at least 3 characters long" });
+    }
+
+    if (password && password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters long" });
+    }
+
+    const updatedUser = await userServices.updateUserProfile(userEmail, {
+      username,
+      password,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        username: updatedUser.username,
+        email: updatedUser.email,
+      },
+    });
+  } catch (error) {
+    console.error("Error in updateUserProfile controller:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -105,23 +160,24 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-const getUserById = async (req, res) => {
+const searchUserByUserName = async (req, res) => {
   try {
-    const { id } = req.params;
-    const user = await userServices.getUserById(id);
+    const { username } = req.params;
+    const users = await userServices.searchUserByUserName(username);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!users || users.length === 0) {
+      return res.status(404).json({ message: "No matching users found" });
     }
 
-    res.status(200).json(user);
+    res.status(200).json(users);
   } catch (error) {
-    console.error("Error in getUserById controller:", error.message);
+    console.error("Error in searchUserByUserName controller:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
 
 const createUser = async (req, res) => {
+  // Kiểm tra dữ liệu đầu vào
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -129,16 +185,23 @@ const createUser = async (req, res) => {
 
   try {
     const { username, email, password, role } = req.body;
-    const user = await userServices.createUser({
+
+    // Gọi đến service để tạo user
+    const result = await userServices.createUser({
       username,
       email,
       password,
       role,
     });
-    res.status(201).json(user);
+
+    // Trả về kết quả nếu thành công
+    res.status(201).json({
+      message: "User created successfully",
+      userId: result.insertId,
+    });
   } catch (error) {
-    console.error("Error in createUser controller:", error.message);
-    res.status(500).json({ message: error.message });
+    console.error("Error in createUser controller:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -150,8 +213,14 @@ const updateUser = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { username, email, role } = req.body;
-    const user = await userServices.updateUser(id, { username, email, role });
+    const { username, email, role, password } = req.body;
+    console.log("🔧 UPDATE REQUEST:", { id, username, email, role });
+    const user = await userServices.updateUser(id, {
+      username,
+      email,
+      role,
+      password,
+    });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -187,8 +256,9 @@ module.exports = {
   verifyOTPAndUpdatePassword,
   getUserProfile,
   getAllUsers,
-  getUserById,
+  searchUserByUserName,
   createUser,
   updateUser,
   deleteUser,
+  updateUserProfile,
 };

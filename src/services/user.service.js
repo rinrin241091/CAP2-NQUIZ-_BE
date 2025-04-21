@@ -50,6 +50,8 @@ const login = async (data) => {
 
     const payload = {
       sub: foundUser.email,
+      role: foundUser.role,
+      id: foundUser.id,
     };
 
     const { accessToken, refreshToken } = await generateToken(payload);
@@ -138,26 +140,33 @@ const verifyOTPAndUpdatePassword = async (email, otp, newPassword) => {
   }
 };
 
-const getUserByEmail = async (email) => {
+const getUserProfile = async (email) => {
   try {
-    const query = "SELECT * FROM users WHERE email = ?";
-    const [users] = await db.promise().query(query, [email]);
+    const query = "SELECT username, email FROM users WHERE email = ?";
+    const [result] = await db.promise().query(query, [email]);
 
-    if (!users || users.length === 0) {
-      return null;
+    if (result.length === 0) {
+      throw new Error("User not found");
     }
 
-    return users[0];
+    return result[0];
   } catch (error) {
-    throw new Error("Error fetching user profile");
+    throw error;
   }
 };
 
 // Admin User Management Services
 const getAllUsers = async () => {
   try {
-    const query =
-      "SELECT user_id, username, email, role, created_at, updated_at FROM users";
+    const query = `
+      SELECT 
+        user_id,
+        username, 
+        email, 
+        role, 
+        DATE_FORMAT(created_at, '%d-%m-%Y') AS created_at 
+      FROM users
+    `;
     const [users] = await db.promise().query(query);
     return users;
   } catch (error) {
@@ -165,54 +174,68 @@ const getAllUsers = async () => {
   }
 };
 
-const getUserById = async (id) => {
+const searchUserByUserName = async (username) => {
   try {
-    const query =
-      "SELECT user_id, username, email, role, created_at, updated_at FROM users WHERE user_id = ?";
-    const [users] = await db.promise().query(query, [id]);
-
-    if (!users || users.length === 0) {
-      return null;
-    }
-
-    return users[0];
+    const query = `
+      SELECT user_id, username, email, role, DATE_FORMAT(created_at, '%d-%m-%Y') AS created_at
+      FROM users
+      WHERE username LIKE ?`;
+    const [users] = await db.promise().query(query, [`%${username}%`]);
+    return users;
   } catch (error) {
-    throw new Error("Error fetching user");
+    throw new Error("Error searching user");
   }
 };
 
 const createUser = async (userData) => {
   try {
-    const { username, email, password, role } = userData;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
 
-    const query =
-      "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)";
-    const [result] = await db
-      .promise()
-      .query(query, [username, email, hashedPassword, role]);
+    const query = `
+      INSERT INTO users (username, email, password, role)
+      VALUES (?, ?, ?, ?)
+    `;
 
-    return {
-      user_id: result.insertId,
-      username,
-      email,
-      role,
-      created_at: new Date(),
-    };
+    const values = [
+      userData.username,
+      userData.email,
+      hashedPassword,
+      userData.role || "user", // fallback nếu không có role
+    ];
+
+    return new Promise((resolve, reject) => {
+      db.query(query, values, (err, result) => {
+        if (err) {
+          console.error("Error inserting user:", err); // để dễ debug
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
+    });
   } catch (error) {
-    throw new Error("Error creating user");
+    console.error("Error in register function:", error);
+    throw new Error("Không thể tạo người dùng");
   }
 };
 
 const updateUser = async (id, userData) => {
   try {
-    const { username, email, role } = userData;
+    const { username, email, role, password } = userData;
 
-    const query =
-      "UPDATE users SET username = ?, email = ?, role = ? WHERE user_id = ?";
-    const [result] = await db
-      .promise()
-      .query(query, [username, email, role, id]);
+    let query = "UPDATE users SET username = ?, email = ?, role = ?";
+    const values = [username, email, role];
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      query += ", password = ?";
+      values.push(hashedPassword);
+    }
+
+    query += " WHERE user_id = ?";
+    values.push(id);
+
+    const [result] = await db.promise().query(query, values);
 
     if (result.affectedRows === 0) {
       return null;
@@ -239,15 +262,82 @@ const deleteUser = async (id) => {
   }
 };
 
+const checkUsernameExists = async (username, excludeEmail = null) => {
+  try {
+    let query = "SELECT COUNT(*) as count FROM users WHERE username = ?";
+    const values = [username];
+
+    if (excludeEmail) {
+      query += " AND email != ?";
+      values.push(excludeEmail);
+    }
+
+    const [result] = await db.promise().query(query, values);
+    return result[0].count > 0;
+  } catch (error) {
+    throw new Error("Error checking username");
+  }
+};
+
+const updateUserProfile = async (email, updateData) => {
+  try {
+    const { username, password } = updateData;
+
+    // Kiểm tra username trùng lặp nếu có thay đổi username
+    if (username) {
+      const isUsernameExists = await checkUsernameExists(username, email);
+      if (isUsernameExists) {
+        throw new Error("Username already exists");
+      }
+    }
+
+    let query = "UPDATE users SET";
+    const values = [];
+
+    if (username) {
+      query += " username = ?,";
+      values.push(username);
+    }
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      query += " password = ?,";
+      values.push(hashedPassword);
+    }
+
+    // Loại bỏ dấu phẩy cuối cùng
+    query = query.slice(0, -1);
+    query += " WHERE email = ?";
+    values.push(email);
+
+    const [result] = await db.promise().query(query, values);
+
+    if (result.affectedRows === 0) {
+      return null;
+    }
+
+    // Lấy thông tin user đã cập nhật
+    const [updatedUser] = await db
+      .promise()
+      .query("SELECT username, email FROM users WHERE email = ?", [email]);
+
+    return updatedUser[0];
+  } catch (error) {
+    throw new Error(error.message || "Error updating user profile");
+  }
+};
+
 module.exports = {
   register,
   login,
   forgotPassword,
   verifyOTPAndUpdatePassword,
-  getUserByEmail,
+  getUserProfile,
   getAllUsers,
-  getUserById,
+  searchUserByUserName,
   createUser,
   updateUser,
   deleteUser,
+  checkUsernameExists,
+  updateUserProfile,
 };
