@@ -126,6 +126,7 @@ const verifyOTPAndUpdatePassword = async (email, otp, newPassword) => {
     const deleteOTPQuery = 'DELETE FROM otp WHERE email = ?';
     await db.promise().query(deleteOTPQuery, [email]);
 
+    console.log('Mật khẩu đã được cập nhật thành công');
     return 'Mật khẩu đã được thay đổi thành công.';
   } catch (error) {
     throw new Error(error.message);
