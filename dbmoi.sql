@@ -133,12 +133,13 @@ DROP TABLE IF EXISTS `otp`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `otp` (
-  `opt_id` int NOT NULL AUTO_INCREMENT,
+  `otp_id` int NOT NULL AUTO_INCREMENT,
   `email` varchar(255) NOT NULL,
   `otp` varchar(6) NOT NULL,
+  `expires_at` timestamp NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `expires_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`opt_id`)
+  PRIMARY KEY (`otp_id`),
+  KEY `email` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
