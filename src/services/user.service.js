@@ -51,7 +51,7 @@ const login = async (data) => {
     const payload = {
       sub: foundUser.email,
       role: foundUser.role,
-      id: foundUser.id,
+      user_id: foundUser.user_id,
     };
 
     const { accessToken, refreshToken } = await generateToken(payload);
