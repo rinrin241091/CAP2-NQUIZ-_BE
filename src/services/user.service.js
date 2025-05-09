@@ -49,11 +49,11 @@ const login = async (data) => {
     }
 
     const payload = {
-      sub: foundUser.email,
-      role: foundUser.role,
       user_id: foundUser.user_id,
+      email: foundUser.email,
+      role: foundUser.role
     };
-
+    console.log("Generated Payload:", payload);
     const { accessToken, refreshToken } = await generateToken(payload);
 
     return {

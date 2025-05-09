@@ -2,12 +2,8 @@ require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_SECRET_KEY;
 
-module.exports.generateToken = async (user) => {
-  console.log("User object:", user);
-
-  const payload = {
-    email: user.sub, 
-  };
+module.exports.generateToken = async (payload) => {
+  console.log("User object:", payload);
 
   console.log("Generated Payload:", payload);
 
