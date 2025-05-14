@@ -10,6 +10,6 @@ router.post("/quiz", authMiddleware, questionController.createQuiz);
 router.post("/", authMiddleware, questionController.createQuestion);
 
 // Get questions for a quiz
-router.get("/quiz/:quizId", authMiddleware, questionController.getQuizQuestions);
+router.get("/quiz/:quizId", questionController.getQuizQuestions);
 
 module.exports = router; 

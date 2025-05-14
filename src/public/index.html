@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://localhost:3000');  // Kết nối tới server
+
+        socket.on('connect', () => {
+            console.log('Đã kết nối với server');
+        });
+
+        // Nhận câu hỏi từ server khi client yêu cầu
+        socket.on('quiz data', (questions) => {
+            displayQuiz(questions);
+        });
+
+        // Nhận kết quả từ server (đúng hay sai)
+        socket.on('answer result', (data) => {
+            alert(`Câu trả lời cho câu hỏi ${data.questionId} là: ${data.isCorrect ? 'Đúng' : 'Sai'}`);
+        });
+
+        // Gửi yêu cầu lấy câu hỏi từ server
+        function getQuizData() {
+            socket.emit('get quiz');
+        }
+
+        // Hiển thị câu hỏi lên giao diện
+        function displayQuiz(questions) {
+            const quizContainer = document.getElementById('quiz-container');
+            quizContainer.innerHTML = '';  // Xóa câu hỏi cũ trước khi thêm câu mới
+
+            questions.forEach((question) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.innerHTML = `
+                    <h3>${question.question_text}</h3>
+                    <div>
+                        ${question.answers.map((answer) => `
+                            <label>
+                                <input type="radio" name="q${question.question_id}" value="${answer.answer_id}">
+                                ${answer.answer_text}
+                            </label><br>
+                        `).join('')}
+                    </div>
+                    <button onclick="submitAnswer(${question.question_id})">Submit Answer</button>
+                `;
+                quizContainer.appendChild(questionDiv);
+            });
+        }
+
+        // Gửi câu trả lời lên server khi người dùng nhấn "Submit Answer"
+        function submitAnswer(questionId) {
+            const answerId = document.querySelector(`input[name="q${questionId}"]:checked`)?.value;
+            if (answerId) {
+                socket.emit('submit answer', {
+                    questionId: questionId,
+                    answerId: answerId,
+                    participantId: socket.id // Dùng socket.id để xác định người tham gia
+                });
+            } else {
+                alert('Please select an answer');
+            }
+        }
+
+        window.onload = getQuizData;  // Tự động lấy câu hỏi khi trang được tải
+    </script>
+</head>
+<body>
+    <h1>Quiz App</h1>
+    <div id="quiz-container"></div> <!-- Nơi hiển thị câu hỏi -->
+</body>
+</html>

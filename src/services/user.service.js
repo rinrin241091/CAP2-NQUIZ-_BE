@@ -1,7 +1,6 @@
-// models/userModel.js
+
 const db = require("../config/db");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
 const { sendEmail } = require("../utils/mail");
 const { verifyToken, generateToken } = require("../utils/jwt");
 
@@ -177,7 +176,8 @@ const resetPassword = async (email, otp, newPassword) => {
     const deleteOTPQuery = "DELETE FROM otp WHERE email = ?";
     await db.promise().query(deleteOTPQuery, [email]);
 
-    return { message: "Mật khẩu đã được cập nhật thành công" };
+    console.log('Mật khẩu đã được cập nhật thành công');
+    return 'Mật khẩu đã được thay đổi thành công.';
   } catch (error) {
     throw new Error(error.message);
   }

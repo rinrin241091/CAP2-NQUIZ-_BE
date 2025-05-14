@@ -2,7 +2,7 @@ const { validationResult } = require("express-validator");
 const userServices = require("../services/user.service");
 
 const registerUser = async (req, res) => {
-  console.log("Processing registration request:", req.body);
+  console.log("Received body:", req.body);
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
