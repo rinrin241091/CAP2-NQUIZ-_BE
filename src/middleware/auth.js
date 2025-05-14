@@ -1,18 +1,21 @@
-const jwt = require("jsonwebtoken");
+const { verifyToken } = require("../utils/jwt");
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
+  console.log("Received token:", token); // ➜ check token nhận đúng chưa
 
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
 
   try {
-    const decoded = jwt.verify(token, "your-secret-key");
+    const decoded = await verifyToken(token);
+    console.log("Decoded token:", decoded); // ➜ log kết quả decode
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: "Invalid token" });
+    console.error("Token verification failed:", error.message);
+    return res.status(401).json({ message: "Invalid user token" });
   }
 };
 

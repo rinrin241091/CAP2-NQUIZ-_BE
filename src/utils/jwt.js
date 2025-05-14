@@ -3,12 +3,20 @@ const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_SECRET_KEY;
 
 module.exports.generateToken = async (payload) => {
-  const accessToken = jwt.sign(payload, secretKey, { expiresIn: "1d" });
-  const refreshToken = jwt.sign(payload, secretKey, { expiresIn: "7d" });
+  const accessToken = jwt.sign(payload, secretKey, {
+    algorithm: "HS256",
+    expiresIn: "1d",
+  });
+  const refreshToken = jwt.sign(payload, secretKey, {
+    algorithm: "HS256",
+    expiresIn: "7d",
+  });
   return { accessToken, refreshToken };
+  console.log(secretKey);
 };
 
 module.exports.verifyToken = async (token) => {
   const decoded = jwt.verify(token, secretKey);
   return decoded;
+  console.log(secretKey);
 };
