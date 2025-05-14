@@ -7,8 +7,13 @@ const router = express.Router();
 // Public routes
 router.post("/register", UserController.registerUser);
 router.post("/login", UserController.login);
+
+// Password reset routes
 router.post("/forgot-password", UserController.forgotPassword);
-router.post("/verify-otp", UserController.verifyOTPAndUpdatePassword);
+router.post("/verify-otp", UserController.verifyOTP);
+router.post("/reset-password", UserController.resetPassword);
+
+// Profile routes
 router.get("/profile", authMiddleware, UserController.getUserProfile);
 router.put("/profile", authMiddleware, UserController.updateUserProfile);
 

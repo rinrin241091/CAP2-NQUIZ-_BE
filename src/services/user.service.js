@@ -48,11 +48,11 @@ const login = async (data) => {
     }
 
     const payload = {
-      sub: foundUser.email,
-      role: foundUser.role,
-      id: foundUser.id,
+      user_id: foundUser.user_id,
+      email: foundUser.email,
+      role: foundUser.role
     };
-
+    console.log("Generated Payload:", payload);
     const { accessToken, refreshToken } = await generateToken(payload);
 
     return {
@@ -77,9 +77,16 @@ const generateOTP = () => {
 };
 
 const sendOTP = async (email, otp) => {
-  const subject = "Mã OTP xác thực thay đổi mật khẩu";
-  const text = `Mã OTP của bạn là: ${otp}. Mã này chỉ có hiệu lực trong 10 phút.`;
-  const html = `<p>Mã OTP của bạn là: <strong>${otp}</strong></p><p>Mã này chỉ có hiệu lực trong 10 phút.</p>`;
+  const subject = "Mã OTP đặt lại mật khẩu";
+  const text = `Mã OTP của bạn là: ${otp}. Mã này có hiệu lực trong 5 phút.`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #333;">Đặt lại mật khẩu</h2>
+      <p>Mã OTP của bạn là: <strong style="font-size: 24px; color: #007bff;">${otp}</strong></p>
+      <p>Mã này có hiệu lực trong 5 phút.</p>
+      <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+    </div>
+  `;
 
   try {
     await sendEmail(email, subject, text, html);
@@ -92,36 +99,72 @@ const sendOTP = async (email, otp) => {
 
 const forgotPassword = async (email) => {
   try {
-    const queryUser = "SELECT * FROM users WHERE email = ?";
-    const [user] = await db.promise().query(queryUser, [email]);
-
+    // Kiểm tra email có tồn tại không
+    const [user] = await db
+      .promise()
+      .query("SELECT * FROM users WHERE email = ?", [email]);
     if (!user || user.length === 0) {
       throw new Error("Email không tồn tại trong hệ thống");
     }
 
+    // Tạo và lưu OTP
     const otp = generateOTP();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // OTP hết hạn sau 5 phút
+
+    // Xóa các OTP cũ của email này
+    await db.promise().query("DELETE FROM otp WHERE email = ?", [email]);
+
+    // Lưu OTP mới
+    await db
+      .promise()
+      .query("INSERT INTO otp (email, otp, expires_at) VALUES (?, ?, ?)", [
+        email,
+        otp,
+        expiresAt,
+      ]);
+
+    // Gửi OTP qua email
     await sendOTP(email, otp);
 
-    // Lưu OTP vào bảng OTP riêng (bảng otp)
-    const insertOTPQuery =
-      "INSERT INTO otp (email, otp, expires_at) VALUES (?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 10 MINUTE))";
-    await db.promise().query(insertOTPQuery, [email, otp]);
-
-    return "OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email để tiếp tục.";
+    return { message: "OTP đã được gửi đến email của bạn" };
   } catch (error) {
     throw new Error(error.message);
   }
 };
 
-const verifyOTPAndUpdatePassword = async (email, otp, newPassword) => {
+const verifyOTP = async (email, otp) => {
   try {
-    // Kiểm tra OTP trong bảng otp
-    const queryOTP =
-      "SELECT * FROM otp WHERE email = ? AND otp = ? AND expires_at > CURRENT_TIMESTAMP";
-    const [otpRecord] = await db.promise().query(queryOTP, [email, otp]);
+    // Kiểm tra OTP
+    const [otpRecord] = await db
+      .promise()
+      .query(
+        "SELECT * FROM otp WHERE email = ? AND otp = ? AND expires_at > NOW()",
+        [email, otp]
+      );
 
     if (!otpRecord || otpRecord.length === 0) {
-      throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn");
+      throw new Error("OTP không hợp lệ hoặc đã hết hạn");
+    }
+
+    return { message: "OTP hợp lệ" };
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
+const resetPassword = async (email, otp, newPassword) => {
+  try {
+    // Kiểm tra OTP
+    const [otpRecord] = await db
+      .promise()
+      .query(
+        "SELECT * FROM otp WHERE email = ? AND otp = ? AND expires_at > NOW()",
+        [email, otp]
+      );
+
+    if (!otpRecord || otpRecord.length === 0) {
+      throw new Error("OTP không hợp lệ hoặc đã hết hạn");
     }
 
     // Mã OTP hợp lệ, tiếp tục cập nhật mật khẩu mới
@@ -140,8 +183,17 @@ const verifyOTPAndUpdatePassword = async (email, otp, newPassword) => {
   }
 };
 
-const getUserProfile = async (email) => {
+const getUserProfile = async (token) => {
   try {
+    // Xác thực token và giải mã
+    const decoded = await verifyToken(token);
+    console.log("Decoded: ", decoded);
+
+    // Lấy email từ 'sub'
+    const email = decoded.email;
+    console.log("Decoded email: ", email);
+
+    // Truy vấn DB với email từ JWT
     const query = "SELECT username, email FROM users WHERE email = ?";
     const [result] = await db.promise().query(query, [email]);
 
@@ -152,6 +204,70 @@ const getUserProfile = async (email) => {
     return result[0];
   } catch (error) {
     throw error;
+  }
+};
+
+const updateUserProfile = async (token, updateData) => {
+  try {
+    // Xác thực và giải mã token
+    const decoded = await verifyToken(token);
+    const email = decoded.email;
+    console.log("Decoded email: ", email);
+
+    const { username, password } = updateData;
+
+    if (!username && !password) {
+      throw new Error("No update data provided");
+    }
+
+    if (username && username.length < 3) {
+      throw new Error("Username must be at least 3 characters long");
+    }
+
+    if (password && password.length < 6) {
+      throw new Error("Password must be at least 6 characters long");
+    }
+
+    // Kiểm tra trùng username
+    if (username) {
+      const isUsernameExists = await checkUsernameExists(username, email);
+      if (isUsernameExists) {
+        throw new Error("Username already exists");
+      }
+    }
+
+    let query = "UPDATE users SET";
+    const values = [];
+
+    if (username) {
+      query += " username = ?,";
+      values.push(username);
+    }
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      query += " password = ?,";
+      values.push(hashedPassword);
+    }
+
+    query = query.slice(0, -1); // Bỏ dấu ,
+    query += " WHERE email = ?";
+    values.push(email);
+
+    const [result] = await db.promise().query(query, values);
+
+    if (result.affectedRows === 0) {
+      throw new Error("User not found or no change applied");
+    }
+
+    // Lấy lại thông tin người dùng sau khi cập nhật
+    const [updatedUser] = await db
+      .promise()
+      .query("SELECT username, email FROM users WHERE email = ?", [email]);
+
+    return updatedUser[0];
+  } catch (error) {
+    throw new Error(error.message || "Error updating user profile");
   }
 };
 
@@ -279,59 +395,12 @@ const checkUsernameExists = async (username, excludeEmail = null) => {
   }
 };
 
-const updateUserProfile = async (email, updateData) => {
-  try {
-    const { username, password } = updateData;
-
-    // Kiểm tra username trùng lặp nếu có thay đổi username
-    if (username) {
-      const isUsernameExists = await checkUsernameExists(username, email);
-      if (isUsernameExists) {
-        throw new Error("Username already exists");
-      }
-    }
-
-    let query = "UPDATE users SET";
-    const values = [];
-
-    if (username) {
-      query += " username = ?,";
-      values.push(username);
-    }
-
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      query += " password = ?,";
-      values.push(hashedPassword);
-    }
-
-    // Loại bỏ dấu phẩy cuối cùng
-    query = query.slice(0, -1);
-    query += " WHERE email = ?";
-    values.push(email);
-
-    const [result] = await db.promise().query(query, values);
-
-    if (result.affectedRows === 0) {
-      return null;
-    }
-
-    // Lấy thông tin user đã cập nhật
-    const [updatedUser] = await db
-      .promise()
-      .query("SELECT username, email FROM users WHERE email = ?", [email]);
-
-    return updatedUser[0];
-  } catch (error) {
-    throw new Error(error.message || "Error updating user profile");
-  }
-};
-
 module.exports = {
   register,
   login,
   forgotPassword,
-  verifyOTPAndUpdatePassword,
+  verifyOTP,
+  resetPassword,
   getUserProfile,
   getAllUsers,
   searchUserByUserName,

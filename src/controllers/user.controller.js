@@ -42,53 +42,74 @@ const login = async (req, res) => {
 };
 
 const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
   try {
-    const message = await userServices.forgotPassword(email);
-    res.status(200).json({ message });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email là bắt buộc" });
+    }
+
+    const result = await userServices.forgotPassword(email);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error in forgotPassword controller:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
 
-const verifyOTPAndUpdatePassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-
+const verifyOTP = async (req, res) => {
   try {
-    const message = await userServices.verifyOTPAndUpdatePassword(
-      email,
-      otp,
-      newPassword
-    );
-    res.status(200).json({ message });
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email và OTP là bắt buộc" });
+    }
+
+    const result = await userServices.verifyOTP(email, otp);
+    res.status(200).json(result);
   } catch (error) {
-    console.error(
-      "Error in verifyOTPAndUpdatePassword controller:",
-      error.message
-    );
+    console.error("Error in verifyOTP controller:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Email, OTP và mật khẩu mới là bắt buộc" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu phải có ít nhất 6 ký tự" });
+    }
+
+    const result = await userServices.resetPassword(email, otp, newPassword);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in resetPassword controller:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
 
 const getUserProfile = async (req, res) => {
   try {
-    if (!req.user || !req.user.email) {
-      return res.status(400).json({ message: "Invalid user token" });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ message: "Access token missing or invalid" });
     }
 
-    const userEmail = req.user.email;
-    const user = await userServices.getUserProfile(userEmail);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const token = authHeader.split(" ")[1];
+    const user = await userServices.getUserProfile(token);
 
     res.status(200).json({
       username: user.username,
       email: user.email,
-      password: "********", // Ẩn mật khẩu
+      password: "********",
     });
   } catch (error) {
     console.error("Error in getUserProfile controller:", error);
@@ -103,38 +124,20 @@ const getUserProfile = async (req, res) => {
 
 const updateUserProfile = async (req, res) => {
   try {
-    if (!req.user || !req.user.email) {
-      return res.status(400).json({ message: "Invalid user token" });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ message: "Access token missing or invalid" });
     }
 
+    const token = authHeader.split(" ")[1];
     const { username, password } = req.body;
-    const userEmail = req.user.email;
 
-    // Validate input
-    if (!username && !password) {
-      return res.status(400).json({ message: "No update data provided" });
-    }
-
-    if (username && username.length < 3) {
-      return res
-        .status(400)
-        .json({ message: "Username must be at least 3 characters long" });
-    }
-
-    if (password && password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
-    }
-
-    const updatedUser = await userServices.updateUserProfile(userEmail, {
+    const updatedUser = await userServices.updateUserProfile(token, {
       username,
       password,
     });
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
 
     res.status(200).json({
       message: "Profile updated successfully",
@@ -145,9 +148,15 @@ const updateUserProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in updateUserProfile controller:", error);
-    res.status(500).json({ message: error.message });
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? "An unexpected error occurred"
+        : error.message;
+
+    res.status(500).json({ message: errorMessage });
   }
 };
+
 
 // Admin User Management Controllers
 const getAllUsers = async (req, res) => {
@@ -253,7 +262,8 @@ module.exports = {
   registerUser,
   login,
   forgotPassword,
-  verifyOTPAndUpdatePassword,
+  verifyOTP,
+  resetPassword,
   getUserProfile,
   getAllUsers,
   searchUserByUserName,
