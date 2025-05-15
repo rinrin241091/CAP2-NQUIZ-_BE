@@ -97,7 +97,12 @@ async function assertDatabaseConnectionOk() {
         });
       }
     });
-
+// Khi client yêu cầu lấy danh sách người chơi của 1 phòng
+    socket.on("getPlayers", (roomId) => {
+      if (rooms[roomId]) {
+        socket.emit("updatePlayers", rooms[roomId].players);
+      }
+    });
 
 
     // Khi người tạo phòng bắt đầu trò chơi
