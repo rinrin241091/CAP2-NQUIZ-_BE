@@ -13,11 +13,12 @@ app.use(cors());
 const userRoutes = require('./routes/user.routes');
 const questionRoutes = require('./routes/question.routes');
 const quizRoutes = require('./routes/quizRoutes');
+const HomePageRoutes = require('./routes/homepage.routes');
 
 app.use('/user', userRoutes);
 app.use('/question', questionRoutes);
-// app.use('/quiz', quizRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/home-page', HomePageRoutes);
 
 
 module.exports = app;

@@ -67,9 +67,24 @@ const getQuizQuestions = async (req, res) => {
     });
   }
 };
+const incrementPlayCount = async (req, res) => {
+  const { quizId } = req.params;
+  console.log("📥 Backend nhận playQuiz với ID:", quizId);
+  try {
+    await quizService.incrementPlayCount(quizId);
+    res.status(200).json({ success: true, message: "Play count and last_played_at updated" });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update play count",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   createQuiz,
   createQuestion,
   getQuizQuestions,
+  incrementPlayCount,
 };

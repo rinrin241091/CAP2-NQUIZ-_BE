@@ -1,5 +1,4 @@
 const db = require("../config/db");
-const bcrypt = require("bcryptjs");
 
 // Tạo quiz mới
 const createQuiz = async (title, description, creator_id, is_public) => {
@@ -129,6 +128,20 @@ const groupQuestionsWithAnswers = (questions) => {
   return result;
 };
 
+const incrementPlayCount = async (quizId) => {
+  try {
+    const query = `
+      UPDATE Quizzes
+      SET 
+        play_count = play_count + 1,
+        last_played_at = CURRENT_TIMESTAMP
+      WHERE quiz_id = ?;
+    `;
+    await db.promise().query(query, [quizId]);
+  } catch (error) {
+    throw new Error("Error incrementing play count: " + error.message);
+  }
+};
 
 
 
@@ -136,4 +149,5 @@ module.exports = {
   createQuiz,
   createQuestion,
   getQuizQuestions,
+  incrementPlayCount,
 };
