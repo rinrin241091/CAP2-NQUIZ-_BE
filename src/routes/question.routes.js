@@ -11,5 +11,6 @@ router.post("/", authMiddleware, questionController.createQuestion);
 
 // Get questions for a quiz
 router.get("/quiz/:quizId", questionController.getQuizQuestions);
+router.post('/:quizId/play', questionController.incrementPlayCount);
 
 module.exports = router; 
