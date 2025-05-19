@@ -59,6 +59,7 @@ const login = async (data) => {
       accessToken,
       refreshToken,
       user: {
+        user_id: foundUser.user_id, 
         email: foundUser.email,
         username: foundUser.username,
         avatar: foundUser.avatar,

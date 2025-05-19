@@ -19,17 +19,25 @@ const addCategoriesRouter = require("./routes/addCategories.routes");
 const questionTypeRoutes = require('./routes/questionType.routes');
 const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 
+const aiRoutes = require("./routes/ai.routes");
+const gameRoutes = require("./routes/gameRoutes");
+
+const questionTypeRoutes = require('./routes/questionType.routes');
+const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 
 app.use('/user', userRoutes);
 
 app.use('/question', questionRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/home-page', HomePageRoutes);
-
+app.use("/game", gameRoutes);
 app.use("/categories", categoryRoutes);
 
 // Sử dụng route cho path /categories
 app.use("/categories", addCategoriesRouter);
+
+
+app.use("/api/ai", aiRoutes);
 
 app.use('/api/question-types', questionTypeRoutes);
 
