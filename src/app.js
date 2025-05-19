@@ -16,6 +16,7 @@ const quizRoutes = require('./routes/quizRoutes');
 const categoryRoutes = require("./routes/categoryRoutes");
 const addCategoriesRouter = require("./routes/addCategories.routes");
 const questionTypeRoutes = require('./routes/questionType.routes');
+const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 
 app.use('/user', userRoutes);
 
@@ -29,6 +30,8 @@ app.use("/categories", categoryRoutes);
 app.use("/categories", addCategoriesRouter);
 
 app.use('/api/question-types', questionTypeRoutes);
+
+app.use('/api', addQuestionWithAnswersRoute);
 
 module.exports = app;
 
