@@ -2,7 +2,7 @@
 const db = require('../config/db');
 
 const addQuiz = async (quizData) => {
-    const { title, description, creator_id, is_public, category_id } = quizData;
+    const { title, description, creator_id, is_public, category_id, image } = quizData;
 
     try {
         const query = `
@@ -12,13 +12,14 @@ const addQuiz = async (quizData) => {
             creator_id, 
             is_public, 
             category_id, 
+            image,
             created_at, 
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
         `;
 
         return new Promise((resolve, reject) => {
-            db.query(query, [title, description, creator_id, is_public, category_id], (err, result) => {
+            db.query(query, [title, description, creator_id, is_public, category_id, image], (err, result) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -34,7 +35,6 @@ const addQuiz = async (quizData) => {
         throw new Error("Lỗi khi thêm quiz vào cơ sở dữ liệu: " + error.message);
     }
 };
-
 const getQuizzesByUserId = async (userId) => {
     try {
         const query = `

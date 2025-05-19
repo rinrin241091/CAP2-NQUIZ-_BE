@@ -1,16 +1,25 @@
 const quizService = require('../services/quiz.service'); // Sử dụng quizService thay vì model trực tiếp
+const uploadToS3 = require('../middleware/aws'); // Đường dẫn đến middleware AWS S3
 
 const store = async (req, res) => {
+  console.log("req.body:", req.body);
+  console.log("req.file:", req.file);
   const quizData = req.body;
-
-  // Lấy creator_id từ req.user (được gán bởi middleware authenticateJWT)
   const creator_id = req.user.user_id;
-
-  // Thêm creator_id vào quizData
   quizData.creator_id = creator_id;
-
+  
   try {
-    // Sử dụng quizService để thêm quiz
+    // Nếu có file ảnh, upload lên S3
+    if (req.file) {
+  const imageUrl = await uploadToS3(
+    req.file.buffer,                 // ✅ dùng buffer
+    req.file.originalname,
+    req.file.mimetype
+  );
+  quizData.image = imageUrl;
+}
+
+
     const newQuiz = await quizService.addQuiz(quizData);
     res.status(201).json({ message: 'Quiz added successfully!', data: newQuiz });
   } catch (error) {

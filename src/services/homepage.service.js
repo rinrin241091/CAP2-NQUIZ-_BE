@@ -25,7 +25,7 @@ const getRandomQuizzesEachDay = () => {
        FROM quizzes q
        JOIN users u ON q.creator_id = u.user_id
        ORDER BY MD5(CONCAT(CURDATE(), q.quiz_id))
-       LIMIT 6`,
+       LIMIT 5`,
       (err, results) => {
         if (err) return reject(err);
         resolve(results);
@@ -40,7 +40,7 @@ const getMostUsedQuizzes = () => {
        FROM quizzes q
        LEFT JOIN users u ON q.creator_id = u.user_id
        ORDER BY q.play_count DESC
-       LIMIT 6`,
+       LIMIT 5`,
       (err, results) => {
         if (err) return reject(err);
         resolve(results);
@@ -56,7 +56,7 @@ const getRecentlyPlayedQuizzes = () => {
        LEFT JOIN users u ON q.creator_id = u.user_id
        WHERE q.last_played_at IS NOT NULL
        ORDER BY q.last_played_at DESC
-       LIMIT 6`,
+       LIMIT 5`,
       (err, results) => {
         if (err) return reject(err);
         resolve(results);

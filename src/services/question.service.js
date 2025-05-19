@@ -67,66 +67,63 @@ const getQuizQuestions = async (quizId) => {
           q.question_id,
           q.quiz_id,
           q.question_text,
-          q.question_type,
+          qt.name AS question_type,  -- Lấy tên loại câu hỏi từ bảng question_type
           q.time_limit,
           q.points,
           a.answer_id,
           a.answer_text,
           a.is_correct
       FROM 
-          Questions q
+          questions q
       LEFT JOIN 
-          Answers a ON q.question_id = a.question_id
+          answers a ON q.question_id = a.question_id
+      LEFT JOIN 
+          question_type qt ON q.question_type_id = qt.question_type_id
       WHERE 
           q.quiz_id = ?
-      ORDER BY q.question_id, a.answer_id;  -- Sắp xếp để hiển thị tất cả đáp án của câu hỏi
+      ORDER BY 
+          q.question_id, a.answer_id;
     `;
     
-    // Truy vấn cơ sở dữ liệu và trả về kết quả
     const [questions] = await db.promise().query(query, [quizId]);
-    console.log("Questions and answers fetched:", questions); // Debugging log
+    console.log("Questions and answers fetched:", questions);
 
-    // Nhóm câu hỏi và các đáp án của chúng
     const groupedQuestions = groupQuestionsWithAnswers(questions);
-
-    // Trả về câu hỏi và đáp án theo định dạng mong muốn
     return groupedQuestions;
   } catch (error) {
     throw new Error("Error getting quiz questions and answers: " + error.message);
   }
 };
 
-// Hàm nhóm câu hỏi và đáp án
 const groupQuestionsWithAnswers = (questions) => {
   const result = [];
 
-  // Lặp qua các câu hỏi
   questions.forEach((question) => {
     const existingQuestion = result.find((q) => q.question_id === question.question_id);
 
-    // Nếu câu hỏi đã có trong danh sách, thêm đáp án vào
     if (existingQuestion) {
       existingQuestion.answers.push({
         text: question.answer_text,
-        correct: question.is_correct === 1, // Chuyển đổi is_correct từ 1/0 thành true/false
+        correct: question.is_correct === 1,
       });
     } else {
-      // Nếu chưa có, tạo mới câu hỏi và đáp án của nó
       result.push({
         question_id: question.question_id,
         question_text: question.question_text,
-        answers: [
-          {
-            text: question.answer_text,
-            correct: question.is_correct === 1, // Chuyển đổi is_correct từ 1/0 thành true/false
-          },
-        ],
+        question_type: question.question_type || "Unknown",
+        time_limit: question.time_limit,
+        points: question.points,
+        answers: question.answer_text ? [{
+          text: question.answer_text,
+          correct: question.is_correct === 1,
+        }] : [],
       });
     }
   });
 
   return result;
 };
+
 
 const incrementPlayCount = async (quizId) => {
   try {
