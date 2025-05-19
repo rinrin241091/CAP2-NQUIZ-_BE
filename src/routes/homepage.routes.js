@@ -7,7 +7,7 @@ router.get('/random', quizController.getRandomDaily);
 router.get('/popular', quizController.getPopularQuizzes);
 router.get('/recently-played', quizController.getRecentlyPlayed);
 
-
+router.get("/user/:userId", quizController.getQuizzesByUser);
 router.get('/:id', quizController.getById);
 
 

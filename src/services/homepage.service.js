@@ -64,6 +64,22 @@ const getRecentlyPlayedQuizzes = () => {
     );
   });
 };
+const getQuizzesByUser = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.query(
+      `SELECT q.*, u.username AS users
+       FROM quizzes q
+       LEFT JOIN users u ON q.creator_id = u.user_id
+       WHERE q.creator_id = ?
+       ORDER BY q.created_at DESC`,
+      [userId],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+};
 
 module.exports = {
   getAllQuizzes,
@@ -71,4 +87,5 @@ module.exports = {
   getRandomQuizzesEachDay,
   getMostUsedQuizzes,
   getRecentlyPlayedQuizzes,
+  getQuizzesByUser
 };
