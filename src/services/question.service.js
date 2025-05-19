@@ -74,9 +74,9 @@ const getQuizQuestions = async (quizId) => {
           a.answer_text,
           a.is_correct
       FROM 
-          Questions q
+          questions q
       LEFT JOIN 
-          Answers a ON q.question_id = a.question_id
+          answers a ON q.question_id = a.question_id
       WHERE 
           q.quiz_id = ?
       ORDER BY q.question_id, a.answer_id;  -- Sắp xếp để hiển thị tất cả đáp án của câu hỏi
