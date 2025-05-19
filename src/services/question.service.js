@@ -128,7 +128,7 @@ const groupQuestionsWithAnswers = (questions) => {
 const incrementPlayCount = async (quizId) => {
   try {
     const query = `
-      UPDATE Quizzes
+      UPDATE quizzes
       SET 
         play_count = play_count + 1,
         last_played_at = CURRENT_TIMESTAMP
