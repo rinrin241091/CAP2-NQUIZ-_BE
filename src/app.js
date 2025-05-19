@@ -21,7 +21,10 @@ const addQuestionWithAnswersRoute = require("./routes/addQuestionWithAnswers.rou
 const aiRoutes = require("./routes/ai.routes");
 const gameRoutes = require("./routes/gameRoutes");
 
+<<<<<<< HEAD
 const dashboardRoutes = require('./routes/dashboard.routes');
+=======
+>>>>>>> 759b1e7ad12b8ede90fb804176f209cf3731c672
 
 
 app.use('/api/dashboard', dashboardRoutes);
