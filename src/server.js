@@ -206,7 +206,7 @@ async function init() {
     
       const quizId = rooms[roomId].quizId;
     
-      axios.get(`http://localhost:3000/question/quiz/${quizId}`)
+      axios.get(`https://cap2-nquiz-fe.onrender.com/question/quiz/${quizId}`)
         .then((response) => {
           if (response.data.success) {
             const availableQuestions = response.data.data;  // Lấy danh sách câu hỏi từ API
