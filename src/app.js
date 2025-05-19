@@ -22,8 +22,6 @@ const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.rou
 const aiRoutes = require("./routes/ai.routes");
 const gameRoutes = require("./routes/gameRoutes");
 
-const questionTypeRoutes = require('./routes/questionType.routes');
-const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 
 app.use('/user', userRoutes);
 
