@@ -16,6 +16,8 @@ const quizRoutes = require('./routes/quizRoutes');
 const HomePageRoutes = require('./routes/homepage.routes');
 const categoryRoutes = require("./routes/categoryRoutes");
 const addCategoriesRouter = require("./routes/addCategories.routes");
+const questionTypeRoutes = require('./routes/questionType.routes');
+const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 
 const aiRoutes = require("./routes/ai.routes");
 const gameRoutes = require("./routes/gameRoutes");
@@ -33,6 +35,7 @@ app.use("/categories", categoryRoutes);
 
 // Sử dụng route cho path /categories
 app.use("/categories", addCategoriesRouter);
+
 
 app.use("/api/ai", aiRoutes);
 
