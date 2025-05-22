@@ -11,4 +11,6 @@ router.post("/", authenticateJWT, upload.single('image'), quizController.store);
 // Route để lấy danh sách quiz của user
 router.get("/my-quizzes", authenticateJWT, quizController.getUserQuizzes);
 
+router.delete("/delete/:id", quizController.deleteQuiz);
+
 module.exports = router;

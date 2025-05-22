@@ -6,7 +6,7 @@
     <title>Quiz App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        const socket = io('http://localhost:3000');  // Kết nối tới server
+        const socket = io('https://cap2-nquiz-fe.onrender.com');  // Kết nối tới server
 
         socket.on('connect', () => {
             console.log('Đã kết nối với server');

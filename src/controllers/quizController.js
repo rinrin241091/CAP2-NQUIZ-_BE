@@ -72,10 +72,36 @@ const submitAnswer = async (req, res) => {
         res.status(500).send('Error submitting answer');
     }
 };
+const deleteQuiz = async (req, res) => {
+  const { id } = req.params;
 
+  try {
+    const [result] = await quizService.deleteQuizById(id);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Quiz not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Quiz deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting quiz:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting quiz",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
     getQuizData,
     submitAnswer,
     store,
-    getUserQuizzes
+    getUserQuizzes,
+    deleteQuiz
 };

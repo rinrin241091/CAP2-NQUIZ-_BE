@@ -1,4 +1,4 @@
-// 📁 services/quiz.service.js
+
 const db = require('../config/db');
 
 const getAllQuizzes = () => {
