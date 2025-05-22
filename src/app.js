@@ -23,7 +23,9 @@ const gameRoutes = require("./routes/gameRoutes");
 
 const dashboardRoutes = require('./routes/dashboard.routes');
 
+const historyRoutes = require('./routes/history.routes');
 
+const navigateRoutes = require('./routes/navigate.routes');
 
 app.use('/api/dashboard', dashboardRoutes);
 
@@ -44,5 +46,9 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/question-types", questionTypeRoutes);
 
 app.use("/api", addQuestionWithAnswersRoute);
+
+app.use("/history", historyRoutes);
+
+app.use("/navigate", navigateRoutes);
 
 module.exports = app;

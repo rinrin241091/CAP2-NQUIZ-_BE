@@ -109,10 +109,15 @@ const checkAnswer = async (questionId, answerId) => {
         });
     });
 };
+const deleteQuizById = async (quizId) => {
+  const query = "DELETE FROM quizzes WHERE quiz_id = ?";
+  return db.promise().execute(query, [quizId]);
+};
 
 module.exports = {
     addQuiz,
     getQuizzesByUserId,
     getQuestionsWithAnswers,
-    checkAnswer
+    checkAnswer,
+    deleteQuizById
 };
