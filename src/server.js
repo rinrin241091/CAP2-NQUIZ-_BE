@@ -193,6 +193,22 @@ async function init() {
           socket.emit("updatePlayers", rooms[roomId].players);
         }
       });
+      socket.on("requestCurrentQuestion", (roomId) => {
+        const room = rooms[roomId];
+        if (!room || !room.currentQuestion) return;
+
+        const formattedAnswers = room.currentQuestion.answers.map((a) => ({
+          text: a.text,
+          correct: !!a.correct,
+        }));
+
+        socket.emit("newQuestion", {
+          question: room.currentQuestion.question_text,
+          answers: formattedAnswers,
+          question_type: room.currentQuestion.question_type,
+          time_limit: room.currentQuestion.time_limit || 10,
+        });
+      });
 
       socket.on("disconnect", () => {
         for (const roomId in rooms) {
@@ -202,59 +218,6 @@ async function init() {
       });
     });
 
-    // function askNewQuestion(roomId) {
-    //   const room = rooms[roomId];
-    //   if (!room) return;
-
-    //   const allQuestions = room.questions;
-    //   const unasked = allQuestions.filter((_, i) => !room.askedQuestions.includes(i));
-
-    //   if (unasked.length === 0) {
-    //     const winner = room.players.length
-    //     ? room.players.reduce((prev, curr) => (curr.score > prev.score ? curr : prev))
-    //     : { name: "No one", score: 0 };
-
-    //     const finalScores = room.players.map(p => ({ name: p.name, score: p.score }));
-    //     if (!room.players || room.players.length === 0) {
-    //     io.to(roomId).emit("gameOver", {
-    //       winner: "No players",
-    //       scores: [],
-    //     });
-    //     delete rooms[roomId];
-    //     return;
-    //     }
-    //   }
-
-    //   const index = Math.floor(Math.random() * unasked.length);
-    //   const question = unasked[index];
-    //   const realIndex = allQuestions.indexOf(question);
-    //   room.askedQuestions.push(realIndex);
-
-    //   room.currentQuestion = question;
-    //   room.questionStartTime = Date.now();
-    //   room.answersReceived = 0;
-    //   room.playerAnswers = [];
-
-    //   const correctIndex = question.answers.findIndex((a) => a.correct);
-    //   room.correctAnswer = correctIndex;
-
-    //   const correctIndices = question.answers.map((a, i) => a.correct ? i : null).filter(i => i !== null);
-    //   room.correctAnswers = correctIndices;
-
-    //   const correctText = question.answers.find(a => a.correct)?.text?.toLowerCase().trim();
-    //   room.correctText = correctText;
-
-    //   const formattedAnswers = question.answers.map((a) => ({ text: a.text, correct: !!a.correct }));
-
-    //   io.to(roomId).emit("newQuestion", {
-    //     question: question.question_text,
-    //     answers: formattedAnswers,
-    //     question_type: question.question_type,
-    //     time_limit: question.time_limit || 10,
-    //   });
-
-    //   room.questionTimeout = setTimeout(() => finishQuestion(roomId), (question.time_limit || 10) * 1000);
-    // }
 function askNewQuestion(roomId) {
   const room = rooms[roomId];
   if (!room) return;
