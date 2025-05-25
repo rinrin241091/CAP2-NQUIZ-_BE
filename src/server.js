@@ -267,6 +267,7 @@ function askNewQuestion(roomId) {
   }));
 
   io.to(roomId).emit("newQuestion", {
+    quizId: room.quizId,
     question: question.question_text,
     answers: formattedAnswers,
     question_type: question.question_type,

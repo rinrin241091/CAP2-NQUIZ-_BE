@@ -1,6 +1,6 @@
 const db = require("../config/db");
 
-const saveFullGame  = async ({ quizId, hostId, roomPin, players, responses }) => {
+const saveFullGame = async ({ quizId, hostId, roomPin, players, responses }) => {
   const [sessionResult] = await db.promise().query(
     "INSERT INTO gamesessions (quiz_id, host_id, room_pin) VALUES (?, ?, ?)",
     [quizId, hostId, roomPin]
@@ -29,9 +29,6 @@ const saveFullGame  = async ({ quizId, hostId, roomPin, players, responses }) =>
 
   for (const res of responses) {
     const player = participantMap[res.playerName];
-    console.log("🧪 res.playerName =", res.playerName);
-console.log("📌 participantMap =", participantMap);
-
     if (!player) continue;
 
     const [questionRows] = await db.promise().query(
@@ -39,27 +36,44 @@ console.log("📌 participantMap =", participantMap);
       [res.questionText, quizId]
     );
     const questionId = questionRows[0]?.question_id;
-
     if (!questionId) continue;
 
-    let answerId = null;
-    let isCorrect = 0;
-
+    // Single Choice
     if (res.answerIndex !== undefined) {
       const [answerRows] = await db.promise().query(
         "SELECT answer_id, is_correct FROM answers WHERE question_id = ? LIMIT ?, 1",
         [questionId, res.answerIndex]
       );
       if (answerRows[0]) {
-        answerId = answerRows[0].answer_id;
-        isCorrect = answerRows[0].is_correct;
+        const answerId = answerRows[0].answer_id;
+        const isCorrect = answerRows[0].is_correct;
+        await db.promise().query(
+          "INSERT INTO userresponses (participant_id, question_id, answer_id, is_correct, response_time) VALUES (?, ?, ?, ?, ?)",
+          [player.participantId, questionId, answerId, isCorrect, res.timeTaken || 0]
+        );
       }
     }
-
-    if (answerId !== null) {
+    // Multiple Choice
+    else if (Array.isArray(res.answerIndices)) {
+      for (const idx of res.answerIndices) {
+        const [answerRows] = await db.promise().query(
+          "SELECT answer_id, is_correct FROM answers WHERE question_id = ? LIMIT ?, 1",
+          [questionId, idx]
+        );
+        if (answerRows[0]) {
+          const ans = answerRows[0];
+          await db.promise().query(
+            "INSERT INTO userresponses (participant_id, question_id, answer_id, is_correct, response_time) VALUES (?, ?, ?, ?, ?)",
+            [player.participantId, questionId, ans.answer_id, ans.is_correct, res.timeTaken || 0]
+          );
+        }
+      }
+    }
+    // Short Answer
+    else if (res.answerText) {
       await db.promise().query(
-        "INSERT INTO userresponses (participant_id, question_id, answer_id, is_correct, response_time) VALUES (?, ?, ?, ?, ?)",
-        [player.participantId, questionId, answerId, isCorrect, res.timeTaken || 0]
+        "INSERT INTO userresponses (participant_id, question_id, answer_id, is_correct, response_time) VALUES (?, ?, NULL, NULL, ?)",
+        [player.participantId, questionId, res.timeTaken || 0]
       );
     }
   }
@@ -87,7 +101,6 @@ console.log("📌 participantMap =", participantMap);
   return { success: true, sessionId };
 };
 
-
 module.exports = {
-    saveFullGame
+  saveFullGame
 };
