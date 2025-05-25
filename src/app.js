@@ -15,8 +15,9 @@ const HomePageRoutes = require("./routes/homepage.routes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const addCategoriesRouter = require("./routes/addCategories.routes");
 
-const questionTypeRoutes = require("./routes/questionType.routes");
-const addQuestionWithAnswersRoute = require("./routes/addQuestionWithAnswers.route");
+const questionTypeRoutes = require('./routes/questionType.routes');
+const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
+const questionByQuizRoute = require('./routes/questionByQuizRoute');
 
 const aiRoutes = require("./routes/ai.routes");
 const gameRoutes = require("./routes/gameRoutes");
@@ -50,5 +51,7 @@ app.use("/api", addQuestionWithAnswersRoute);
 app.use("/history", historyRoutes);
 
 app.use("/navigate", navigateRoutes);
+
+app.use('/api', questionByQuizRoute);
 
 module.exports = app;
