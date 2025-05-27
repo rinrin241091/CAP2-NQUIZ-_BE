@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Public routes
 router.post("/register", UserController.registerUser);
+router.post("/send-otp-register", UserController.sendOtpRegister);
 router.post("/login", UserController.login);
 
 // Password reset routes
