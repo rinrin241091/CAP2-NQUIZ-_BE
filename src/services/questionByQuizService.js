@@ -3,7 +3,7 @@ const db = require('../config/db');
 const getQuestionsByQuizId = (quizId) => {
   return new Promise((resolve, reject) => {
     // Chỉ chọn cột question_text
-    const query = 'SELECT question_text FROM questions WHERE quiz_id = ?';
+    const query = 'SELECT question_id, question_text FROM questions WHERE quiz_id = ?';
     db.query(query, [quizId], (err, results) => {
       if (err) {
         reject(err);

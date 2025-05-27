@@ -19,7 +19,7 @@ const questionTypeRoutes = require('./routes/questionType.routes');
 const addQuestionWithAnswersRoute = require('./routes/addQuestionWithAnswers.route');
 const questionByQuizRoute = require('./routes/questionByQuizRoute');
 
-const aiRoutes = require("./routes/ai.routes");
+const aiRoutes = require("./routes/gemini.routes");
 const gameRoutes = require("./routes/gameRoutes");
 
 const dashboardRoutes = require('./routes/dashboard.routes');
