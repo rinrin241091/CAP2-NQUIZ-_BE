@@ -1,4 +1,4 @@
-const { generateExplanation } = require("../services/geminiService");
+const { generateExplanation } = require("../services/gemini.Service");
 const explainQuestion = async (req, res) => {
   const { question } = req.body;
 
