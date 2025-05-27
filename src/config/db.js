@@ -11,6 +11,7 @@ const db = mysql.createConnection({
 db.connect((err) => {
   if (err) {
     console.error('Lỗi kết nối MySQL:', err);
+     setTimeout(connectWithRetry, 5000);
   } else {
     console.log('Kết nối MySQL thành công!');
   }
