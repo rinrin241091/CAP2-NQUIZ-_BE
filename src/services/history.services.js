@@ -92,64 +92,71 @@ const getQuizAttemptsByUserAndQuiz = async (userId, quizId) => {
 };
 
 // Lấy review theo session_id
-  const getQuizReviewBySession = async (sessionId, userId) => {
-    const query = `
-      SELECT 
-        q.question_id,
-        q.question_text,
-        qt.name AS question_type,
-        q.time_limit,
-        q.points,
-        a.answer_id,
-        a.answer_text,
-        a.is_correct,
-        ur.answer_id AS user_answer_id
-      FROM questions q
-      JOIN question_type qt ON q.question_type_id = qt.question_type_id
-      JOIN answers a ON q.question_id = a.question_id
-      LEFT JOIN userresponses ur ON ur.question_id = q.question_id
-        AND ur.participant_id = (
-          SELECT participant_id 
-          FROM gameparticipants 
-          WHERE session_id = ? AND user_id = ?
-          LIMIT 1
-        )
-      WHERE q.quiz_id = (
-        SELECT quiz_id FROM gamesessions WHERE session_id = ?
-      )
-      ORDER BY q.question_id, a.answer_id;
-    `;
-    const [rows] = await db.promise().query(query, [sessionId, userId, sessionId]);
+const getQuizReviewBySession = async (sessionId, userId) => {
+   console.log("🧪 Fetching sessionId, userId:", sessionId, userId);
 
-    const grouped = {};
-    rows.forEach((row) => {
-      if (!grouped[row.question_id]) {
-        grouped[row.question_id] = {
-          question_id: row.question_id,
-          question_text: row.question_text,
-          question_type: row.question_type,
-          time_limit: row.time_limit,
-          points: row.points,
-          user_answer_id: row.user_answer_id,
-          answers: [],
-        };
-      }
+  const query = `
+    SELECT 
+      q.question_id,
+      q.question_text,
+      qt.name AS question_type,
+      q.time_limit,
+      q.points,
+      a.answer_id,
+      a.answer_text,
+      a.is_correct,
+      (
+        SELECT ur.answer_id
+        FROM userresponses ur
+        WHERE ur.question_id = q.question_id
+          AND ur.participant_id = (
+            SELECT participant_id 
+            FROM gameparticipants 
+            WHERE session_id = ? AND user_id = ?
+            LIMIT 1
+          )
+        LIMIT 1
+      ) AS user_answer_id
+    FROM questions q
+    JOIN question_type qt ON q.question_type_id = qt.question_type_id
+    JOIN answers a ON a.question_id = q.question_id
+    WHERE q.quiz_id = (
+      SELECT quiz_id FROM gamesessions WHERE session_id = ?
+    )
+    ORDER BY q.question_id, a.answer_id;
+  `;
 
-      const alreadyExists = grouped[row.question_id].answers.find(
-        (a) => a.answer_id === row.answer_id
-      );
-      if (!alreadyExists) {
-        grouped[row.question_id].answers.push({
-          answer_id: row.answer_id,
-          text: row.answer_text,
-          correct: !!row.is_correct,
-        });
-      }
+  const [rows] = await db.promise().query(query, [sessionId, userId, sessionId]);
 
-    });
+  const grouped = {};
+  rows.forEach((row) => {
+    if (!grouped[row.question_id]) {
+      grouped[row.question_id] = {
+        question_id: row.question_id,
+        question_text: row.question_text,
+        question_type: row.question_type,
+        time_limit: row.time_limit,
+        points: row.points,
+        user_answer_id: row.user_answer_id,
+        answers: [],
+      };
+    }
 
-    return Object.values(grouped);
-  };
+    const alreadyExists = grouped[row.question_id].answers.find(
+      (a) => a.answer_id === row.answer_id
+    );
+    if (!alreadyExists) {
+      grouped[row.question_id].answers.push({
+        answer_id: row.answer_id,
+        text: row.answer_text,
+        correct: !!row.is_correct,
+      });
+    }
+  });
+
+  return Object.values(grouped);
+};
+
 
 module.exports = {
   getQuizzesHistory,
