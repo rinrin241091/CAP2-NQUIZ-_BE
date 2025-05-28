@@ -64,7 +64,7 @@ async function init() {
     const server = http.createServer(app);
     const io = socketIo(server, {
       cors: {
-        origin: "*",
+        origin: "https://cap2-nquiz-fe.onrender.com",
         methods: ["GET", "POST"]
       }
     });
