@@ -105,13 +105,30 @@ async function init() {
           return;
         }
 
+        if (room.players.length >= 10) {
+          socket.emit("roomJoined", {
+            success: false,
+            message: "Phòng đã đầy, không thể tham gia.",
+          });
+          return;
+        }
+
         socket.join(roomId);
-        const status = room.currentQuestion ? 'playing' : 'waiting';
-        room.players.push({ id: socket.id, name, score: 0, status });
+
+        // ✅ Check nếu người chơi đã tồn tại (theo tên hoặc theo socket.id)
+        const alreadyExists = room.players.some(
+          (p) => p.id === socket.id || p.name === name
+        );
+
+        if (!alreadyExists) {
+          const status = room.currentQuestion ? 'playing' : 'waiting';
+          room.players.push({ id: socket.id, name, score: 0, status });
+        }
 
         io.to(roomId).emit('updatePlayers', room.players);
         socket.emit('roomJoined', { success: true, roomId, message: `${name} đã tham gia!` });
       });
+
 
       socket.on("startGame", (roomId) => {
         const roomData = rooms[roomId];
@@ -123,6 +140,18 @@ async function init() {
 
         io.to(roomId).emit('gameStarted', roomData.players);
         askNewQuestion(roomId);
+      });
+      
+      socket.on("kickPlayer", (roomId, socketIdToKick) => {
+        const room = rooms[roomId];
+        if (!room) return;
+
+        // Xóa người chơi khỏi danh sách
+        room.players = room.players.filter((p) => p.id !== socketIdToKick);
+
+        // Gửi thông báo kick
+        io.to(socketIdToKick).emit("kicked");
+        io.to(roomId).emit("updatePlayers", room.players);
       });
 
       socket.on("submitAnswer", (roomId, answerIndex, timeTaken) => {
