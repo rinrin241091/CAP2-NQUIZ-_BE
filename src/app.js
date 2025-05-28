@@ -6,7 +6,10 @@ const authMiddleware = require("./middleware/auth"); // Import middleware xác t
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(cors({
+  origin: "https://cap2-nquiz-fe.onrender.com",
+  credentials: true
+}));
 
 const userRoutes = require("./routes/user.routes");
 const questionRoutes = require("./routes/question.routes");
