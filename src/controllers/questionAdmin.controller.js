@@ -9,6 +9,7 @@ exports.getAllQuestions = async (req, res) => {
   }
 };
 
+
 exports.createQuestion = async (req, res) => {
   try {
     const newQuestion = await questionService.createQuestion(req.body);
