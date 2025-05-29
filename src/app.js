@@ -46,7 +46,7 @@ app.use("/game", gameRoutes);
 app.use("/categories", categoryRoutes);
 
 // Sử dụng route cho path /categories
-//app.use("/categories", addCategoriesRouter);
+// app.use("/categoriess", addCategoriesRouter);
 
 app.use("/api/ai", aiRoutes);
 
