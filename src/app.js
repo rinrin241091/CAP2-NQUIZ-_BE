@@ -28,7 +28,14 @@ const historyRoutes = require('./routes/history.routes');
 
 const navigateRoutes = require('./routes/navigate.routes');
 
+const quizAdminRoutes = require('./routes/quizAdmin.routes');
+const questionAdminRoutes = require('./routes/questionAdmin.routes');
+const answerAdminRoutes = require('./routes/answerAdmin.routes');
+
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin/quizzes', quizAdminRoutes);
+app.use('/api/admin/questions', questionAdminRoutes);
+app.use('/api/admin/answers', answerAdminRoutes);
 
 
 app.use("/user", userRoutes);
@@ -40,7 +47,7 @@ app.use("/game", gameRoutes);
 app.use("/categories", categoryRoutes);
 
 // Sử dụng route cho path /categories
-app.use("/categories", addCategoriesRouter);
+//app.use("/categories", addCategoriesRouter);
 
 app.use("/api/ai", aiRoutes);
 
