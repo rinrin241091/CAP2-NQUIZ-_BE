@@ -1,16 +1,25 @@
 const quizService = require('../services/quiz.service'); // Sử dụng quizService thay vì model trực tiếp
+const uploadToS3 = require('../middleware/aws'); // Đường dẫn đến middleware AWS S3
 
 const store = async (req, res) => {
+  console.log("req.body:", req.body);
+  console.log("req.file:", req.file);
   const quizData = req.body;
-
-  // Lấy creator_id từ req.user (được gán bởi middleware authenticateJWT)
   const creator_id = req.user.user_id;
-
-  // Thêm creator_id vào quizData
   quizData.creator_id = creator_id;
-
+  
   try {
-    // Sử dụng quizService để thêm quiz
+    // Nếu có file ảnh, upload lên S3
+    if (req.file) {
+  const imageUrl = await uploadToS3(
+    req.file.buffer,                 // ✅ dùng buffer
+    req.file.originalname,
+    req.file.mimetype
+  );
+  quizData.image = imageUrl;
+}
+
+
     const newQuiz = await quizService.addQuiz(quizData);
     res.status(201).json({ message: 'Quiz added successfully!', data: newQuiz });
   } catch (error) {
@@ -63,10 +72,36 @@ const submitAnswer = async (req, res) => {
         res.status(500).send('Error submitting answer');
     }
 };
+const deleteQuiz = async (req, res) => {
+  const { id } = req.params;
 
+  try {
+    const [result] = await quizService.deleteQuizById(id);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Quiz not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Quiz deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting quiz:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting quiz",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
     getQuizData,
     submitAnswer,
     store,
-    getUserQuizzes
+    getUserQuizzes,
+    deleteQuiz
 };

@@ -1,13 +1,40 @@
 const http = require('http');
 const socketIo = require('socket.io');
-const axios = require('axios');
 const db = require('./config/db');
-const port = process.env.PORT || 3000;
 const app = require('./app');
+const fuzz = require('fuzzball');
 require('dotenv').config();
 
-
+const port = process.env.PORT || 3000;
 const rooms = {};
+
+function convertVietnameseWordsToNumber(str) {
+  const rawMap = {
+    "một": "1", "hai": "2", "ba": "3", "bốn": "4", "tư": "4", "năm": "5",
+    "sáu": "6", "bảy": "7", "tám": "8", "chín": "9", "không": "0"
+  };
+
+  // Normalize keys of the map (remove dấu)
+  const map = {};
+  for (let key in rawMap) {
+    const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    map[normalizedKey] = rawMap[key];
+  }
+
+  const normalizedInput = str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .split(/\s+/); // split by space
+
+  const result = normalizedInput.map(word => map[word] || "").join("");
+
+  console.log("🧪 Normalize debug:", { input: str, output: result });
+  return result;
+}
+
+
 
 const generateRoomId = () => {
   let roomId;
@@ -17,311 +44,355 @@ const generateRoomId = () => {
   return roomId;
 };
 
-// Kiểm tra kết nối cơ sở dữ liệu
 async function assertDatabaseConnectionOk() {
   return new Promise((resolve, reject) => {
-    console.log("Đang kiểm tra kết nối cơ sở dữ liệu...");
     db.connect((err) => {
       if (err) {
-        console.error("Không thể kết nối đến cơ sở dữ liệu:", err.message);
-        reject(new Error("Không thể kết nối đến cơ sở dữ liệu"));
+        console.error("❌ Không thể kết nối đến cơ sở dữ liệu:", err.message);
+        reject(new Error("DB connection failed"));
       } else {
-        console.log("Kết nối cơ sở dữ liệu OK!");
+        console.log("✅ Kết nối cơ sở dữ liệu OK!");
         resolve();
       }
     });
   });
 }
 
-// Khởi tạo server
 async function init() {
   try {
     await assertDatabaseConnectionOk();
-    console.log(`Khởi động Express trên cổng ${port}...`);
-
     const server = http.createServer(app);
     const io = socketIo(server, {
       cors: {
-        origin: "*",  // Cho phép tất cả các nguồn gốc
-        // origin: "http://localhost:5173",  // Đảm bảo client của bạn truy cập đúng
+        origin: "https://cap2-nquiz-fe.onrender.com",
         methods: ["GET", "POST"]
       }
     });
 
-    
-
     io.on("connection", (socket) => {
-      console.log("Một người dùng đã kết nối");
+      console.log("🟢 Người dùng đã kết nối:", socket.id);
 
-      // Sự kiện tạo phòng mới
-    socket.on('createRoom', (name, quizId) => {
-      const roomId = generateRoomId();
-      socket.join(roomId);
-      io.to(roomId).emit("message", `${name} đã tạo phòng thành công! Phòng ID: ${roomId}`);
+      socket.on('createRoom', (name, quizId, questions) => {
+        console.log("🟢 createRoom được gọi:", { name, quizId });
+        console.log("🧾 Số lượng câu hỏi FE truyền:", questions?.length);
+        console.log("🔍 Câu hỏi đầu tiên:", questions?.[0]);
 
-      rooms[roomId] = {
-        players: [{ id: socket.id, name, score: 0, status: 'waiting' }],
-        currentQuestion: null,
-        correctAnswer: null,
-        questionTimeout: null,
-        answersReceived: 0,
-        playerAnswers: [],
-        askedQuestions: [],
-        quizId: quizId, // ✅ thêm dòng này
-      };
+        const roomId = generateRoomId();
+        socket.join(roomId);
 
-      socket.emit('roomCreated', roomId);
-      console.log("Danh sách người chơi: ", rooms[roomId].players);
-      console.log(`Phòng đã được tạo với ID: ${roomId}`);
-    });
+        rooms[roomId] = {
+          players: [{ id: socket.id, name, score: 0, status: 'waiting' }],
+          questions,
+          currentQuestion: null,
+          correctAnswer: null,
+          correctAnswers: [],
+          correctText: null,
+          questionTimeout: null,
+          answersReceived: 0,
+          playerAnswers: [],
+          askedQuestions: [],
+          quizId,
+        };
 
-
-    socket.on("joinRoom", (roomId, name) => {
-      if (!rooms[roomId]) {
-        socket.emit('roomJoined', { success: false, message: 'Phòng không tồn tại!' });
-        return;
-      }
-
-      socket.join(roomId); // Người chơi tham gia phòng
-      const roomData = rooms[roomId];
-
-      // Nếu game đã chạy (có câu hỏi đang hiện hành) thì đăng ký ngay với trạng thái 'playing'
-      if (roomData.currentQuestion) {
-        roomData.players.push({ id: socket.id, name, score: 0, status: 'playing' });
-      } else {
-        roomData.players.push({ id: socket.id, name, score: 0, status: 'waiting' });
-      }
-
-      io.to(roomId).emit('updatePlayers', roomData.players);
-      socket.emit('roomJoined', { success: true, roomId, message: `${name} đã tham gia phòng!` });
-
-      if (roomData.currentQuestion) {
-        // Delay 100ms để đảm bảo client đã đăng ký sự kiện "currentQuestion"
-        setTimeout(() => {
-          const question = roomData.currentQuestion;
-          // Tính thời gian còn lại (giả sử mỗi câu có 10 giây)
-          const elapsed = Date.now() - roomData.questionStartTime;
-          const remainingTime = Math.max(10 - Math.floor(elapsed / 1000), 0);
-          const formattedAnswers = question.answers.map((a) => ({
-            text: a.text,
-            correct: a.correct === true
-          }));
-          socket.emit("currentQuestion", {
-            question: question.question_text,
-            answers: formattedAnswers,
-            timer: remainingTime,
-          });
-        }, 100);
-      }
-    });
-
-    // Khi game bắt đầu, cập nhật trạng thái của tất cả người chơi
-    socket.on("startGame", (roomId) => {
-      const roomData = rooms[roomId];
-      if (!roomData) return;
-
-      // Đổi trạng thái của tất cả người chơi thành 'playing'
-      roomData.players.forEach(player => {
-        player.status = 'playing';
+        socket.emit('roomCreated', roomId);
+        console.log(`🧩 Phòng ${roomId} được tạo bởi ${name}`);
       });
 
-      io.to(roomId).emit('gameStarted', roomData.players);
-      askNewQuestion(roomId);
-    });
+      socket.on("joinRoom", (roomId, name) => {
+        const room = rooms[roomId];
+        if (!room) {
+          socket.emit('roomJoined', { success: false, message: 'Phòng không tồn tại!' });
+          return;
+        }
+
+        if (room.players.length >= 10) {
+          socket.emit("roomJoined", {
+            success: false,
+            message: "Phòng đã đầy, không thể tham gia.",
+          });
+          return;
+        }
+
+        socket.join(roomId);
+
+        // ✅ Check nếu người chơi đã tồn tại (theo tên hoặc theo socket.id)
+        const alreadyExists = room.players.some(
+          (p) => p.id === socket.id || p.name === name
+        );
+
+        if (!alreadyExists) {
+          const status = room.currentQuestion ? 'playing' : 'waiting';
+          room.players.push({ id: socket.id, name, score: 0, status });
+        }
+
+        io.to(roomId).emit('updatePlayers', room.players);
+        socket.emit('roomJoined', { success: true, roomId, message: `${name} đã tham gia!` });
+      });
 
 
-            // Khi client yêu cầu lấy danh sách người chơi của 1 phòng
-      socket.on("getPlayers", (roomId) => {
-        if (rooms[roomId]) {
-          socket.emit("updatePlayers", rooms[roomId].players);
+      socket.on("startGame", (roomId) => {
+        const roomData = rooms[roomId];
+        if (!roomData) return;
+
+        roomData.players.forEach(player => {
+          player.status = 'playing';
+        });
+
+        io.to(roomId).emit('gameStarted', roomData.players);
+        askNewQuestion(roomId);
+      });
+      
+      socket.on("kickPlayer", (roomId, socketIdToKick) => {
+        const room = rooms[roomId];
+        if (!room) return;
+
+        // Xóa người chơi khỏi danh sách
+        room.players = room.players.filter((p) => p.id !== socketIdToKick);
+
+        // Gửi thông báo kick
+        io.to(socketIdToKick).emit("kicked");
+        io.to(roomId).emit("updatePlayers", room.players);
+      });
+
+      socket.on("submitAnswer", (roomId, answerIndex, timeTaken) => {
+        const room = rooms[roomId];
+        if (!room || !room.currentQuestion) return;
+        if (!room.playerAnswers.find(a => a.id === socket.id)) {
+          room.playerAnswers.push({ id: socket.id, answerIndex, timeTaken });
+          room.answersReceived++;
+          if (room.answersReceived === room.players.length) {
+            clearTimeout(room.questionTimeout);
+            finishQuestion(roomId);
+          }
         }
       });
-      // Xử lý việc trả lời
-      socket.on("submitAnswer", (roomId, answerIndex, timeTaken) => {
-        const roomData = rooms[roomId];
-        if (!roomData || !roomData.currentQuestion) return;
 
-        if (!roomData.playerAnswers.find((ans) => ans.id === socket.id)) {
-          roomData.playerAnswers.push({
-            id: socket.id,
-            answerIndex,
-            timeTaken,
-          });
+      socket.on("submitMultipleAnswers", (roomId, answerIndices, timeTaken) => {
+        const room = rooms[roomId];
+        if (!room || !room.currentQuestion) return;
+        if (!room.playerAnswers.find(a => a.id === socket.id)) {
+          room.playerAnswers.push({ id: socket.id, answerIndices, timeTaken });
+          room.answersReceived++;
+          if (room.answersReceived === room.players.length) {
+            clearTimeout(room.questionTimeout);
+            finishQuestion(roomId);
+          }
+        }
+      });
 
-          roomData.answersReceived++;
-
-          if (roomData.answersReceived === roomData.players.length) {
-            clearTimeout(roomData.questionTimeout);
+      socket.on("submitShortAnswer", (roomId, answerText, timeTaken) => {
+        const room = rooms[roomId];
+        if (!room || !room.currentQuestion) return;
+        if (!room.playerAnswers.find(a => a.id === socket.id)) {
+          room.playerAnswers.push({ id: socket.id, answerText, timeTaken });
+          room.answersReceived++;
+          if (room.answersReceived === room.players.length) {
+            clearTimeout(room.questionTimeout);
             finishQuestion(roomId);
           }
         }
       });
 
       socket.on("pauseGame", (roomId) => {
-        const roomData = rooms[roomId];
-        if (roomData) {
-          roomData.isPaused = true;
-          clearTimeout(roomData.questionTimeout); // dừng timeout đang chạy
+        const room = rooms[roomId];
+        if (room) {
+          room.isPaused = true;
+          clearTimeout(room.questionTimeout);
           io.to(roomId).emit("gamePaused");
         }
       });
 
       socket.on("resumeGame", (roomId) => {
-        const roomData = rooms[roomId];
-        if (roomData && roomData.isPaused) {
-          roomData.isPaused = false;
+        const room = rooms[roomId];
+        if (room && room.isPaused) {
+          room.isPaused = false;
           io.to(roomId).emit("gameResumed");
-          // Nếu cần, thiết lập lại questionTimeout hoặc xử lý phần tiếp tục câu hỏi
-          // Ví dụ: 
-          const elapsed = Date.now() - roomData.questionStartTime;
-          const remainingTime = Math.max(10 - Math.floor(elapsed / 1000), 0);
-          // Nếu câu hỏi chưa hết thời gian, bạn có thể tiếp tục timeout:
-          if (remainingTime > 0) {
-            roomData.questionTimeout = setTimeout(() => {
-              finishQuestion(roomId);
-            }, remainingTime * 1000);
+          const elapsed = Date.now() - room.questionStartTime;
+          const remaining = Math.max(10 - Math.floor(elapsed / 1000), 0);
+          if (remaining > 0) {
+            room.questionTimeout = setTimeout(() => finishQuestion(roomId), remaining * 1000);
           } else {
             finishQuestion(roomId);
           }
         }
       });
 
-      // Xử lý sự kiện ngắt kết nối
+      socket.on("getPlayers", (roomId) => {
+        if (rooms[roomId]) {
+          socket.emit("updatePlayers", rooms[roomId].players);
+        }
+      });
+      socket.on("requestCurrentQuestion", (roomId) => {
+        const room = rooms[roomId];
+        if (!room || !room.currentQuestion) return;
+
+        const formattedAnswers = room.currentQuestion.answers.map((a) => ({
+          text: a.text,
+          correct: !!a.correct,
+        }));
+
+        socket.emit("newQuestion", {
+          question: room.currentQuestion.question_text,
+          answers: formattedAnswers,
+          question_type: room.currentQuestion.question_type,
+          time_limit: room.currentQuestion.time_limit || 10,
+        });
+      });
+
       socket.on("disconnect", () => {
         for (const roomId in rooms) {
-          rooms[roomId].players = rooms[roomId].players.filter(
-            (player) => player.id !== socket.id
-          );
+          rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
         }
-        console.log("Một người dùng đã ngắt kết nối");
+        console.log("🔴 Người dùng đã ngắt kết nối:", socket.id);
       });
     });
 
-    function askNewQuestion(roomId) {
-      if (rooms[roomId].players.length === 0) {
-        clearTimeout(rooms[roomId].questionTimeout);
-        delete rooms[roomId];
-        return;
+function askNewQuestion(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const allQuestions = room.questions || [];
+  const unasked = allQuestions.filter((_, i) => !room.askedQuestions.includes(i));
+
+  if (unasked.length === 0 || allQuestions.length === 0) {
+    const winner = room.players.length
+      ? room.players.reduce((prev, curr) => (curr.score > prev.score ? curr : prev))
+      : { name: "No one", score: 0 };
+
+    const finalScores = room.players.map(p => ({ name: p.name, score: p.score }));
+    io.to(roomId).emit("gameOver", { winner: winner.name, scores: finalScores });
+    delete rooms[roomId];
+    return;
+  }
+
+  const index = Math.floor(Math.random() * unasked.length);
+  const question = unasked[index];
+  const realIndex = allQuestions.indexOf(question);
+  room.askedQuestions.push(realIndex);
+
+  // 🛡️ Kiểm tra dữ liệu câu hỏi trước khi dùng
+  if (!question || !question.answers || !Array.isArray(question.answers)) {
+    console.error("❌ Invalid question format:", question);
+    askNewQuestion(roomId); // Bỏ qua câu hỏi lỗi và hỏi câu khác
+    return;
+  }
+
+  room.currentQuestion = question;
+  room.questionStartTime = Date.now();
+  room.answersReceived = 0;
+  room.playerAnswers = [];
+
+  const correctIndex = question.answers.findIndex((a) => a.correct);
+  const correctIndices = question.answers.map((a, i) => a.correct ? i : null).filter(i => i !== null);
+  const correctText = question.answers.find(a => a.correct)?.text?.toLowerCase().trim();
+
+  room.correctAnswer = correctIndex;
+  room.correctAnswers = correctIndices;
+  room.correctText = correctText;
+
+  const formattedAnswers = question.answers.map((a) => ({
+    text: a.text,
+    correct: !!a.correct,
+  }));
+
+  io.to(roomId).emit("newQuestion", {
+    quizId: room.quizId,
+    question: question.question_text,
+    answers: formattedAnswers,
+    question_type: question.question_type,
+    time_limit: question.time_limit || 10,
+  });
+
+  room.questionTimeout = setTimeout(() => finishQuestion(roomId), (question.time_limit || 10) * 1000);
+}
+
+function finishQuestion(roomId) {
+  const room = rooms[roomId];
+  if (!room || !room.currentQuestion) return;
+
+  const { question_type, time_limit = 10 } = room.currentQuestion;
+  const players = room.players;
+
+  // 👉 Hàm tính điểm theo thời gian
+  const calculateScore = (timeTaken) => {
+    return Math.round(Math.max(((time_limit - timeTaken) / time_limit) * 10, 1) * 100) / 100;
+  };
+
+  if (question_type === "Single Choice") {
+    room.playerAnswers
+      .filter(a => a.answerIndex === room.correctAnswer)
+      .sort((a, b) => a.timeTaken - b.timeTaken)
+      .forEach(a => {
+        const player = players.find(p => p.id === a.id);
+        if (player) player.score += calculateScore(a.timeTaken);
+      });
+
+    io.to(roomId).emit("answerResult", {
+      correctAnswer: room.correctAnswer,
+      scores: players.map(p => ({ name: p.name, score: p.score })),
+    });
+  }
+
+  else if (question_type === "Multiple Choice") {
+    room.playerAnswers.forEach(a => {
+      const correct = room.correctAnswers;
+      const selected = a.answerIndices;
+      const isCorrect = selected.length === correct.length && selected.every(i => correct.includes(i));
+      if (isCorrect) {
+        const player = players.find(p => p.id === a.id);
+        if (player) player.score += calculateScore(a.timeTaken);
       }
-    
-      const quizId = rooms[roomId].quizId;
-    
-      axios.get(`http://localhost:3000/question/quiz/${quizId}`)
-        .then((response) => {
-          if (response.data.success) {
-            const availableQuestions = response.data.data;  // Lấy danh sách câu hỏi từ API
-    
-            // Lọc các câu hỏi chưa được hỏi
-            const unaskedQuestions = availableQuestions.filter((_, index) => !rooms[roomId].askedQuestions.includes(index));
-    
-            if (unaskedQuestions.length === 0) {
-              const winner = rooms[roomId].players.reduce((prev, curr) =>
-                curr.score > prev.score ? curr : prev
-              );
-    
-              const finalScores = rooms[roomId].players.map(player => ({
-                name: player.name,
-                score: player.score,
-              }));
-    
-              io.to(roomId).emit("gameOver", { 
-                winner: winner.name,
-                scores: finalScores,
-              });
-    
-              delete rooms[roomId];  // Xóa phòng sau khi kết thúc
-              return;
-            }
-    
-            const randomIndex = Math.floor(Math.random() * unaskedQuestions.length);
-            const question = unaskedQuestions[randomIndex];
-    
-            // Lưu câu hỏi đã hỏi vào phòng để không bị hỏi lại
-            const actualIndex = availableQuestions.indexOf(question);
-            rooms[roomId].askedQuestions.push(actualIndex);
-    
-            rooms[roomId].currentQuestion = question;
-            // Lưu lại thời điểm bắt đầu câu hỏi
-            rooms[roomId].questionStartTime = Date.now();
-    
-            const correctAnswerIndex = question.answers.findIndex((ans) => ans.correct);
-            rooms[roomId].correctAnswer = correctAnswerIndex;
-            rooms[roomId].answersReceived = 0;
-            rooms[roomId].playerAnswers = [];
-    
-            const formattedAnswers = question.answers.map((a) => ({
-              text: a.text,
-              correct: a.correct === true  
-            }));
-    
-            io.to(roomId).emit("newQuestion", {
-              question: question.question_text,
-              answers: formattedAnswers,
-              timer: 10,
-            });
-    
-            rooms[roomId].questionTimeout = setTimeout(() => {
-              finishQuestion(roomId);
-            }, 10000);
-    
-          } else {
-            io.to(roomId).emit("message", "Không tìm thấy câu hỏi cho quiz này.");
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching questions from API:", error);
-          io.to(roomId).emit("message", "Lỗi khi lấy câu hỏi từ API.");
-        });
-    }
-
-    function finishQuestion(room) {
-      if (!rooms[room]) return;
-      const correctIndex = rooms[room].correctAnswer;
-      const playerAnswers = rooms[room].playerAnswers;
-
-      // Chỉ cộng điểm cho những người trả lời đúng
-      playerAnswers
-        .filter((a) => a.answerIndex === correctIndex)
-        .sort((a, b) => a.timeTaken - b.timeTaken)
-        .forEach((ans) => {
-          const player = rooms[room].players.find((p) => p.id === ans.id);
-          if (player) {
-            player.score += Math.max(10 - ans.timeTaken, 1); // Cộng điểm cho người trả lời đúng và nhanh
-          }
-        });
-
-      // Không trừ điểm cho người trả lời sai nữa
-      // playerAnswers
-      //   .filter((a) => a.answerIndex !== correctIndex)
-      //   .forEach((ans) => {
-      //     const player = rooms[room].players.find((p) => p.id === ans.id);
-      //     if (player) {
-      //       player.score = Math.max(player.score - 1, 0); // Không còn phần này
-      //     }
-      //   });
-
-      // Gửi kết quả câu trả lời và điểm số của mọi người
-      io.to(room).emit("answerResult", {
-        correctAnswer: correctIndex,
-        scores: rooms[room].players.map((p) => ({
-          name: p.name,
-          score: p.score,
-        })),
-      });
-
-      // Chuyển sang câu hỏi tiếp theo sau 1 giây
-      setTimeout(() => {
-        askNewQuestion(room);
-      }, 1500);
-    }
-
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
     });
 
-  } catch (error) {
-    console.error("Lỗi khi khởi động ứng dụng:", error.message);
+    io.to(roomId).emit("answerResult", {
+      correctAnswers: room.correctAnswers,
+      scores: players.map(p => ({ name: p.name, score: p.score })),
+    });
+  }
+
+  else if (question_type === "Short Answer") {
+    room.playerAnswers.forEach((a) => {
+      const userAnswer = a.answerText?.toLowerCase().trim();
+      const normalizedUser = convertVietnameseWordsToNumber(userAnswer) || userAnswer;
+
+      const correctText = room.correctText?.toLowerCase().trim();
+      const normalizedCorrect = isNaN(correctText)
+        ? convertVietnameseWordsToNumber(correctText) || correctText
+        : correctText;
+
+      const similarity = fuzz.ratio(normalizedUser, normalizedCorrect);
+
+      console.log("🧪 So sánh:", {
+        userAnswer,
+        normalizedUser,
+        correctText: room.correctText,
+        normalizedCorrect,
+        similarity
+      });
+
+      const isCorrect = similarity >= 85;
+      if (isCorrect) {
+        const player = players.find((p) => p.id === a.id);
+        if (player) player.score += calculateScore(a.timeTaken);
+      }
+    });
+
+    io.to(roomId).emit("answerResult", {
+      correctAnswer: room.correctText,
+      scores: players.map((p) => ({ name: p.name, score: p.score })),
+    });
+  }
+
+  // Gửi câu hỏi tiếp theo sau 1.5 giây
+  setTimeout(() => askNewQuestion(roomId), 1500);
+}
+
+
+    server.listen(port, () => {
+      console.log(`🚀 Server is running on port ${port}`);
+    });
+  } catch (err) {
+    console.error("❌ Lỗi khởi động:", err.message);
     process.exit(1);
   }
 }

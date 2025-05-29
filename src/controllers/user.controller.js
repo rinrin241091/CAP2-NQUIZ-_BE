@@ -1,24 +1,48 @@
 const { validationResult } = require("express-validator");
 const userServices = require("../services/user.service");
+const db = require("../config/db");
+
+const sendOtpRegister = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email là bắt buộc" });
+
+    // ✅ Không kiểm tra email tồn tại ở đây (vì là đăng ký)
+    const result = await userServices.sendOtpRegister(email);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in sendOtpRegister controller:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 const registerUser = async (req, res) => {
   console.log("Received body:", req.body);
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  const { username, email, password } = req.body;
+  const { username, email, password, otp } = req.body;
 
   try {
+    await userServices.verifyOTP(email, otp);
+
+    // ✅ Kiểm tra email đã được dùng chưa
+    const [existing] = await db
+      .promise()
+      .query("SELECT * FROM users WHERE email = ?", [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: "Email đã được sử dụng" });
+    }
+
     const result = await userServices.register({ username, email, password });
+
+    // Xoá OTP sau đăng ký thành công
+    await db.promise().query("DELETE FROM otp WHERE email = ?", [email]);
+
     res
       .status(201)
       .json({ message: "Đăng ký thành công", userId: result.insertId });
   } catch (error) {
-    res.status(500).json({
-      message: "Đã xảy ra lỗi khi đăng ký người dùng",
-      error: error.message,
+    console.error("🔥 Register Error:", error);
+    res.status(400).json({
+      message: error.message || "Đã xảy ra lỗi khi đăng ký người dùng",
     });
   }
 };
@@ -157,7 +181,6 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-
 // Admin User Management Controllers
 const getAllUsers = async (req, res) => {
   try {
@@ -271,4 +294,5 @@ module.exports = {
   updateUser,
   deleteUser,
   updateUserProfile,
+  sendOtpRegister,
 };

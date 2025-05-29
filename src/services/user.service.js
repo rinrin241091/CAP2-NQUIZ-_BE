@@ -1,19 +1,44 @@
-
 const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 const { sendEmail } = require("../utils/mail");
 const { verifyToken, generateToken } = require("../utils/jwt");
 
+
+const sendOtpRegister = async (email) => {
+  try {
+    // Tạo và lưu OTP
+    const otp = generateOTP();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // OTP hết hạn sau 5 phút
+
+    // Xóa các OTP cũ nếu có
+    await db.promise().query("DELETE FROM otp WHERE email = ?", [email]);
+
+    // Lưu OTP mới
+    await db.promise().query(
+      "INSERT INTO otp (email, otp, expires_at) VALUES (?, ?, ?)",
+      [email, otp, expiresAt]
+    );
+
+    // Gửi OTP
+    await sendOTP(email, otp);
+
+    return { message: "OTP đã được gửi đến email của bạn" };
+  } catch (error) {
+    throw new Error(error.message || "Lỗi gửi OTP");
+  }
+};
+
 const register = async (userData) => {
   try {
     const hashedPassword = await bcrypt.hash(userData.password, 10);
-    const query =
-      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
+    const query = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
     const values = [userData.username, userData.email, hashedPassword];
 
     return new Promise((resolve, reject) => {
       db.query(query, values, (err, result) => {
         if (err) {
+          console.error("❌ DB INSERT ERROR:", err); // 👈 log rõ lỗi SQL
           reject(err);
         } else {
           resolve(result);
@@ -78,7 +103,7 @@ const generateOTP = () => {
 };
 
 const sendOTP = async (email, otp) => {
-  const subject = "Mã OTP đặt lại mật khẩu";
+  const subject = "Đây là mã OTPcuar bạn.";
   const text = `Mã OTP của bạn là: ${otp}. Mã này có hiệu lực trong 5 phút.`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -137,6 +162,8 @@ const forgotPassword = async (email) => {
 const verifyOTP = async (email, otp) => {
   try {
     // Kiểm tra OTP
+    console.log("📥 verifyOTP input:", email, otp);
+
     const [otpRecord] = await db
       .promise()
       .query(
@@ -410,4 +437,5 @@ module.exports = {
   deleteUser,
   checkUsernameExists,
   updateUserProfile,
+  sendOtpRegister
 };

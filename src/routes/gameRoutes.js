@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const gameController = require("../controllers/gameController");
 
-router.post("/participant", gameController.addParticipant);
-router.post("/response", gameController.saveResponse);
-router.post("/report", gameController.submitReport);
+router.post('/save-results', gameController.saveGameResults);
 
 module.exports = router;
